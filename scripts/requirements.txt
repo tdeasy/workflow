@@ -1,0 +1,2 @@
+# Python requirements for MIDI export script
+mido==1.3.2

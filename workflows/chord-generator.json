@@ -1,0 +1,82 @@
+{
+  "name": "House Music Chord Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Workflow Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "bpm",
+              "value": "={{ $json.bpm || 128 }}"
+            },
+            {
+              "name": "bars",
+              "value": "={{ $json.bars || 8 }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "key",
+              "value": "={{ $json.key || 'A' }}"
+            },
+            {
+              "name": "scale",
+              "value": "={{ $json.scale || 'minor' }}"
+            },
+            {
+              "name": "voicing",
+              "value": "={{ $json.voicing || 'open' }}"
+            }
+          ]
+        }
+      },
+      "id": "set-parameters",
+      "name": "Set Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// House Music Chord Progression Generator\nconst bpm = $input.first().json.bpm || 128;\nconst bars = $input.first().json.bars || 8;\nconst key = $input.first().json.key || 'A';\nconst scale = $input.first().json.scale || 'minor';\nconst voicing = $input.first().json.voicing || 'open';\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\n// Note mapping\nconst noteToMidi = {\n  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,\n  'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,\n  'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11\n};\n\n// Scale intervals\nconst scaleIntervals = {\n  'minor': [0, 2, 3, 5, 7, 8, 10],\n  'major': [0, 2, 4, 5, 7, 9, 11],\n  'dorian': [0, 2, 3, 5, 7, 9, 10],\n  'phrygian': [0, 1, 3, 5, 7, 8, 10]\n};\n\n// Chord types (intervals from root)\nconst chordTypes = {\n  'minor': [0, 3, 7],           // Minor triad\n  'major': [0, 4, 7],           // Major triad\n  'minor7': [0, 3, 7, 10],      // Minor 7th\n  'major7': [0, 4, 7, 11],      // Major 7th\n  'dominant7': [0, 4, 7, 10],   // Dominant 7th\n  'sus2': [0, 2, 7],            // Suspended 2nd\n  'sus4': [0, 5, 7],            // Suspended 4th\n  'add9': [0, 4, 7, 14]         // Add 9 (major with 9th)\n};\n\n// Get root note (octave 3 for chords - middle range)\nconst rootNote = noteToMidi[key] + 48; // C3 = 48\nconst intervals = scaleIntervals[scale] || scaleIntervals['minor'];\n\n// Create scale notes\nconst scaleNotes = [];\nfor (let octave = 0; octave < 3; octave++) {\n  intervals.forEach(interval => {\n    scaleNotes.push(rootNote + interval + (octave * 12));\n  });\n}\n\n// Common house music chord progressions\nconst progressions = {\n  // Using scale degrees (0-indexed)\n  'classic': [\n    { degree: 0, type: 'minor7' },   // i7\n    { degree: 5, type: 'major7' },   // VI7\n    { degree: 3, type: 'major7' },   // IV7\n    { degree: 6, type: 'dominant7' } // VII7\n  ],\n  'uplifting': [\n    { degree: 0, type: 'minor7' },   // i7\n    { degree: 4, type: 'minor7' },   // v7\n    { degree: 5, type: 'major7' },   // VI7\n    { degree: 3, type: 'major7' }    // IV7\n  ],\n  'deep': [\n    { degree: 0, type: 'minor7' },   // i7\n    { degree: 3, type: 'sus2' },     // IV sus2\n    { degree: 6, type: 'dominant7' },// VII7\n    { degree: 0, type: 'minor' }     // i\n  ]\n};\n\nconst progression = progressions['classic'];\nconst midiEvents = [];\nlet eventId = 0;\n\n// Rhythm patterns for chords (house style)\nconst rhythmPatterns = [\n  // Pattern 1: Long sustained chords\n  [\n    { start: 0, duration: 16, velocity: 75 }  // Whole bar\n  ],\n  // Pattern 2: Half note rhythm\n  [\n    { start: 0, duration: 8, velocity: 80 },\n    { start: 8, duration: 8, velocity: 75 }\n  ],\n  // Pattern 3: Syncopated stabs\n  [\n    { start: 0, duration: 3, velocity: 85 },\n    { start: 4, duration: 2, velocity: 75 },\n    { start: 7, duration: 2, velocity: 70 },\n    { start: 10, duration: 3, velocity: 80 },\n    { start: 14, duration: 2, velocity: 75 }\n  ],\n  // Pattern 4: Eighth note stabs\n  [\n    { start: 0, duration: 1.5, velocity: 80 },\n    { start: 2, duration: 1.5, velocity: 75 },\n    { start: 4, duration: 1.5, velocity: 80 },\n    { start: 6, duration: 1.5, velocity: 75 },\n    { start: 8, duration: 1.5, velocity: 85 },\n    { start: 10, duration: 1.5, velocity: 75 },\n    { start: 12, duration: 1.5, velocity: 80 },\n    { start: 14, duration: 1.5, velocity: 75 }\n  ]\n];\n\n// Function to build chord from scale degree\nfunction buildChord(degree, type, octaveOffset = 0) {\n  const baseNote = scaleNotes[degree];\n  const chordIntervals = chordTypes[type] || chordTypes['minor'];\n  \n  return chordIntervals.map(interval => {\n    // For open voicing, spread notes across octaves\n    if (voicing === 'open' && interval > 0) {\n      return baseNote + interval + (Math.floor(interval / 7) * 5);\n    }\n    return baseNote + interval + (octaveOffset * 12);\n  });\n}\n\n// Generate chord progression\nfor (let bar = 0; bar < bars; bar++) {\n  const chordInfo = progression[bar % progression.length];\n  const chord = buildChord(chordInfo.degree, chordInfo.type);\n  \n  // Choose rhythm pattern (vary every 2 bars)\n  const patternIndex = Math.floor(bar / 2) % rhythmPatterns.length;\n  const rhythmPattern = rhythmPatterns[patternIndex];\n  \n  rhythmPattern.forEach(rhythm => {\n    const tick = (bar * beatsPerBar * ticksPerBeat) + (rhythm.start * ticksPerBeat / 4);\n    const duration = rhythm.duration * ticksPerBeat / 4;\n    \n    // Add each note in the chord\n    chord.forEach((note, idx) => {\n      midiEvents.push({\n        id: eventId++,\n        type: 'noteOn',\n        tick: tick,\n        note: note,\n        velocity: rhythm.velocity - (idx * 3), // Slightly decrease velocity for higher notes\n        channel: 1,\n        duration: duration\n      });\n    });\n  });\n}\n\n// Sort by tick\nmidiEvents.sort((a, b) => a.tick - b.tick);\n\nreturn {\n  json: {\n    instrument: 'chords',\n    bpm: bpm,\n    bars: bars,\n    key: key,\n    scale: scale,\n    voicing: voicing,\n    events: midiEvents,\n    totalTicks: bars * beatsPerBar * ticksPerBeat,\n    ticksPerBeat: ticksPerBeat,\n    progression: progression.map(c => `${c.degree} ${c.type}`)\n  }\n};"
+      },
+      "id": "generate-chords",
+      "name": "Generate Chord Progression",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert to MIDI file format\nconst data = $input.first().json;\nconst { events, bpm, ticksPerBeat, bars, key, scale, voicing, progression } = data;\n\nconst midiData = {\n  format: 0,\n  tracks: 1,\n  ticksPerBeat: ticksPerBeat,\n  bpm: bpm,\n  track: {\n    name: `House Chords - ${key} ${scale}`,\n    channel: 1,\n    events: events.map(e => ({\n      type: e.type,\n      tick: e.tick,\n      note: e.note,\n      velocity: e.velocity,\n      duration: e.duration\n    }))\n  },\n  metadata: {\n    progression: progression.join(' -> ')\n  }\n};\n\nreturn {\n  json: {\n    ...data,\n    midiData: midiData,\n    filename: `house_chords_${key}_${scale}_${bpm}bpm_${bars}bars.mid`\n  }\n};"
+      },
+      "id": "format-midi",
+      "name": "Format MIDI Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Workflow Trigger": {
+      "main": [[{"node": "Set Parameters", "type": "main", "index": 0}]]
+    },
+    "Set Parameters": {
+      "main": [[{"node": "Generate Chord Progression", "type": "main", "index": 0}]]
+    },
+    "Generate Chord Progression": {
+      "main": [[{"node": "Format MIDI Data", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "name": "House Music MIDI Master Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "bpm",
+              "value": 128
+            },
+            {
+              "name": "bars",
+              "value": 16
+            }
+          ],
+          "string": [
+            {
+              "name": "key",
+              "value": "A"
+            },
+            {
+              "name": "scale",
+              "value": "minor"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "manual-trigger",
+      "name": "Start - Configure Track",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate BPM range for house music\nconst bpm = $input.first().json.bpm || 128;\nconst bars = $input.first().json.bars || 16;\nconst key = $input.first().json.key || 'A';\nconst scale = $input.first().json.scale || 'minor';\n\n// Ensure BPM is in house music range (120-140)\nconst validatedBpm = Math.max(120, Math.min(140, bpm));\n\nif (bpm !== validatedBpm) {\n  console.log(`BPM adjusted from ${bpm} to ${validatedBpm} to fit house music range (120-140)`);\n}\n\nreturn {\n  json: {\n    bpm: validatedBpm,\n    bars: bars,\n    key: key,\n    scale: scale,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "validate-params",
+      "name": "Validate Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// House Music Drum Pattern Generator (Embedded)\nconst bpm = $input.first().json.bpm;\nconst bars = $input.first().json.bars;\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\nconst drumNotes = {\n  kick: 36, snare: 38, closedHat: 42, openHat: 46,\n  clap: 39, rimshot: 37, crash: 49\n};\n\nconst midiEvents = [];\nlet eventId = 0;\n\n// Kick (4 on the floor)\nfor (let bar = 0; bar < bars; bar++) {\n  for (let beat = 0; beat < beatsPerBar; beat++) {\n    const tick = (bar * beatsPerBar + beat) * ticksPerBeat;\n    midiEvents.push({\n      id: eventId++, type: 'noteOn', tick: tick,\n      note: drumNotes.kick, velocity: beat === 0 ? 110 : 100,\n      channel: 9, duration: ticksPerBeat / 2\n    });\n  }\n}\n\n// Snare/Clap (beats 2 and 4)\nfor (let bar = 0; bar < bars; bar++) {\n  [1, 3].forEach(beat => {\n    const tick = (bar * beatsPerBar + beat) * ticksPerBeat;\n    const useClap = bar % 2 === 1;\n    midiEvents.push({\n      id: eventId++, type: 'noteOn', tick: tick,\n      note: useClap ? drumNotes.clap : drumNotes.snare,\n      velocity: 105, channel: 9, duration: ticksPerBeat / 2\n    });\n  });\n}\n\n// Hi-hats (8th notes)\nfor (let bar = 0; bar < bars; bar++) {\n  for (let eighth = 0; eighth < beatsPerBar * 2; eighth++) {\n    const tick = (bar * beatsPerBar * ticksPerBeat) + (eighth * ticksPerBeat / 2);\n    const isOffbeat = eighth % 2 === 1;\n    const isOpen = isOffbeat && (eighth === 3 || eighth === 7) && bar % 2 === 1;\n    midiEvents.push({\n      id: eventId++, type: 'noteOn', tick: tick,\n      note: isOpen ? drumNotes.openHat : drumNotes.closedHat,\n      velocity: isOffbeat ? 70 : 85, channel: 9,\n      duration: ticksPerBeat / 4\n    });\n  }\n}\n\n// Crash on first beat\nmidiEvents.push({\n  id: eventId++, type: 'noteOn', tick: 0,\n  note: drumNotes.crash, velocity: 100,\n  channel: 9, duration: ticksPerBeat * 2\n});\n\nmidiEvents.sort((a, b) => a.tick - b.tick);\n\nreturn {\n  json: {\n    instrument: 'drums',\n    events: midiEvents,\n    channel: 9\n  }\n};"
+      },
+      "id": "generate-drums",
+      "name": "Generate Drums",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// House Music Bass Pattern Generator (Embedded)\nconst params = $('Validate Parameters').first().json;\nconst { bpm, bars, key, scale } = params;\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\nconst noteToMidi = {\n  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4,\n  'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,\n  'A': 9, 'A#': 10, 'Bb': 10, 'B': 11\n};\n\nconst scaleIntervals = {\n  'minor': [0, 2, 3, 5, 7, 8, 10],\n  'major': [0, 2, 4, 5, 7, 9, 11],\n  'dorian': [0, 2, 3, 5, 7, 9, 10]\n};\n\nconst rootNote = noteToMidi[key] + 24;\nconst intervals = scaleIntervals[scale] || scaleIntervals['minor'];\nconst scaleNotes = [];\n\nfor (let octave = 0; octave < 2; octave++) {\n  intervals.forEach(interval => {\n    scaleNotes.push(rootNote + interval + (octave * 12));\n  });\n}\n\nconst bassPatterns = [\n  [\n    { step: 0, note: 0, duration: 2, velocity: 100 },\n    { step: 2, note: 0, duration: 1, velocity: 80 },\n    { step: 4, note: 7, duration: 2, velocity: 90 },\n    { step: 6, note: 0, duration: 1, velocity: 85 },\n    { step: 8, note: 0, duration: 2, velocity: 100 },\n    { step: 10, note: 3, duration: 1, velocity: 85 },\n    { step: 12, note: 0, duration: 2, velocity: 95 },\n    { step: 14, note: 7, duration: 1, velocity: 80 }\n  ],\n  [\n    { step: 0, note: 0, duration: 1.5, velocity: 100 },\n    { step: 2, note: 7, duration: 1, velocity: 85 },\n    { step: 3.5, note: 0, duration: 1, velocity: 90 },\n    { step: 5, note: 3, duration: 1.5, velocity: 85 },\n    { step: 7, note: 0, duration: 1, velocity: 95 },\n    { step: 8, note: 0, duration: 2, velocity: 100 },\n    { step: 11, note: 5, duration: 1, velocity: 80 },\n    { step: 13, note: 0, duration: 1.5, velocity: 90 },\n    { step: 15, note: 7, duration: 0.5, velocity: 75 }\n  ]\n];\n\nconst midiEvents = [];\nlet eventId = 0;\nconst progressionDegrees = [0, 5, 2, 6];\n\nfor (let bar = 0; bar < bars; bar++) {\n  const patternIndex = Math.floor(bar / 2) % bassPatterns.length;\n  const pattern = bassPatterns[patternIndex];\n  const chordRoot = progressionDegrees[bar % 4];\n  \n  pattern.forEach(note => {\n    const tick = (bar * beatsPerBar * ticksPerBeat) + (note.step * ticksPerBeat / 4);\n    const noteIndex = (chordRoot + note.note) % scaleNotes.length;\n    midiEvents.push({\n      id: eventId++, type: 'noteOn', tick: tick,\n      note: scaleNotes[noteIndex], velocity: note.velocity,\n      channel: 0, duration: (note.duration * ticksPerBeat / 4)\n    });\n  });\n}\n\nmidiEvents.sort((a, b) => a.tick - b.tick);\n\nreturn {\n  json: {\n    instrument: 'bass',\n    events: midiEvents,\n    channel: 0\n  }\n};"
+      },
+      "id": "generate-bass",
+      "name": "Generate Bass",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// House Music Chord Progression Generator (Embedded)\nconst params = $('Validate Parameters').first().json;\nconst { bpm, bars, key, scale } = params;\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\nconst noteToMidi = {\n  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4,\n  'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8,\n  'A': 9, 'A#': 10, 'Bb': 10, 'B': 11\n};\n\nconst scaleIntervals = {\n  'minor': [0, 2, 3, 5, 7, 8, 10],\n  'major': [0, 2, 4, 5, 7, 9, 11],\n  'dorian': [0, 2, 3, 5, 7, 9, 10]\n};\n\nconst chordTypes = {\n  'minor7': [0, 3, 7, 10],\n  'major7': [0, 4, 7, 11],\n  'dominant7': [0, 4, 7, 10]\n};\n\nconst rootNote = noteToMidi[key] + 48;\nconst intervals = scaleIntervals[scale] || scaleIntervals['minor'];\nconst scaleNotes = [];\n\nfor (let octave = 0; octave < 3; octave++) {\n  intervals.forEach(interval => {\n    scaleNotes.push(rootNote + interval + (octave * 12));\n  });\n}\n\nconst progression = [\n  { degree: 0, type: 'minor7' },\n  { degree: 5, type: 'major7' },\n  { degree: 3, type: 'major7' },\n  { degree: 6, type: 'dominant7' }\n];\n\nconst rhythmPatterns = [\n  [{ start: 0, duration: 16, velocity: 75 }],\n  [\n    { start: 0, duration: 3, velocity: 85 },\n    { start: 4, duration: 2, velocity: 75 },\n    { start: 7, duration: 2, velocity: 70 },\n    { start: 10, duration: 3, velocity: 80 },\n    { start: 14, duration: 2, velocity: 75 }\n  ]\n];\n\nfunction buildChord(degree, type) {\n  const baseNote = scaleNotes[degree];\n  const chordIntervals = chordTypes[type];\n  return chordIntervals.map(interval => baseNote + interval);\n}\n\nconst midiEvents = [];\nlet eventId = 0;\n\nfor (let bar = 0; bar < bars; bar++) {\n  const chordInfo = progression[bar % progression.length];\n  const chord = buildChord(chordInfo.degree, chordInfo.type);\n  const patternIndex = Math.floor(bar / 2) % rhythmPatterns.length;\n  const rhythmPattern = rhythmPatterns[patternIndex];\n  \n  rhythmPattern.forEach(rhythm => {\n    const tick = (bar * beatsPerBar * ticksPerBeat) + (rhythm.start * ticksPerBeat / 4);\n    const duration = rhythm.duration * ticksPerBeat / 4;\n    \n    chord.forEach((note, idx) => {\n      midiEvents.push({\n        id: eventId++, type: 'noteOn', tick: tick, note: note,\n        velocity: rhythm.velocity - (idx * 3), channel: 1,\n        duration: duration\n      });\n    });\n  });\n}\n\nmidiEvents.sort((a, b) => a.tick - b.tick);\n\nreturn {\n  json: {\n    instrument: 'chords',\n    events: midiEvents,\n    channel: 1\n  }\n};"
+      },
+      "id": "generate-chords",
+      "name": "Generate Chords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 680]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all MIDI tracks into one multi-track MIDI file\nconst params = $('Validate Parameters').first().json;\nconst drums = $('Generate Drums').first().json;\nconst bass = $('Generate Bass').first().json;\nconst chords = $('Generate Chords').first().json;\n\nconst { bpm, bars, key, scale } = params;\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\n// Combine all events\nconst allEvents = [\n  ...drums.events.map(e => ({ ...e, track: 0, trackName: 'Drums' })),\n  ...bass.events.map(e => ({ ...e, track: 1, trackName: 'Bass' })),\n  ...chords.events.map(e => ({ ...e, track: 2, trackName: 'Chords' }))\n];\n\n// Sort all events by tick\nallEvents.sort((a, b) => a.tick - b.tick);\n\nconst midiData = {\n  format: 1, // Multi-track format\n  tracks: 3,\n  ticksPerBeat: ticksPerBeat,\n  bpm: bpm,\n  key: key,\n  scale: scale,\n  tracksData: [\n    {\n      name: 'Drums',\n      channel: 9,\n      events: drums.events\n    },\n    {\n      name: 'Bass',\n      channel: 0,\n      events: bass.events\n    },\n    {\n      name: 'Chords',\n      channel: 1,\n      events: chords.events\n    }\n  ],\n  allEvents: allEvents,\n  totalTicks: bars * beatsPerBar * ticksPerBeat,\n  durationSeconds: (bars * beatsPerBar * 60) / bpm\n};\n\nconst filename = `house_music_${key}_${scale}_${bpm}bpm_${bars}bars.mid`;\n\nreturn {\n  json: {\n    midiData: midiData,\n    filename: filename,\n    metadata: {\n      generator: 'n8n House Music MIDI Generator',\n      bpm: bpm,\n      bars: bars,\n      key: key,\n      scale: scale,\n      totalEvents: allEvents.length,\n      durationSeconds: midiData.durationSeconds,\n      timestamp: params.timestamp\n    }\n  }\n};"
+      },
+      "id": "combine-tracks",
+      "name": "Combine All Tracks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 460]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Output summary and MIDI data\nconst data = $input.first().json;\nconst { metadata, filename, midiData } = data;\n\nconsole.log('=== House Music MIDI Generated ===' );\nconsole.log(`File: ${filename}`);\nconsole.log(`BPM: ${metadata.bpm}`);\nconsole.log(`Key: ${metadata.key} ${metadata.scale}`);\nconsole.log(`Bars: ${metadata.bars}`);\nconsole.log(`Duration: ${metadata.durationSeconds.toFixed(2)}s`);\nconsole.log(`Total MIDI Events: ${metadata.totalEvents}`);\nconsole.log(`Tracks: Drums (${midiData.tracksData[0].events.length} events), Bass (${midiData.tracksData[1].events.length} events), Chords (${midiData.tracksData[2].events.length} events)`);\n\nreturn {\n  json: data\n};"
+      },
+      "id": "output-result",
+      "name": "Output Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 460]
+    }
+  ],
+  "connections": {
+    "Start - Configure Track": {
+      "main": [[{"node": "Validate Parameters", "type": "main", "index": 0}]]
+    },
+    "Validate Parameters": {
+      "main": [
+        [
+          {"node": "Generate Drums", "type": "main", "index": 0},
+          {"node": "Generate Bass", "type": "main", "index": 0},
+          {"node": "Generate Chords", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Generate Drums": {
+      "main": [[{"node": "Combine All Tracks", "type": "main", "index": 0}]]
+    },
+    "Generate Bass": {
+      "main": [[{"node": "Combine All Tracks", "type": "main", "index": 0}]]
+    },
+    "Generate Chords": {
+      "main": [[{"node": "Combine All Tracks", "type": "main", "index": 0}]]
+    },
+    "Combine All Tracks": {
+      "main": [[{"node": "Output Result", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "house-music-generator"
+  }
+}
