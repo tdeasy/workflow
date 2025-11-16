@@ -1,0 +1,78 @@
+{
+  "name": "House Music Bass Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Workflow Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "bpm",
+              "value": "={{ $json.bpm || 128 }}"
+            },
+            {
+              "name": "bars",
+              "value": "={{ $json.bars || 8 }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "key",
+              "value": "={{ $json.key || 'A' }}"
+            },
+            {
+              "name": "scale",
+              "value": "={{ $json.scale || 'minor' }}"
+            }
+          ]
+        }
+      },
+      "id": "set-parameters",
+      "name": "Set Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// House Music Bass Pattern Generator\nconst bpm = $input.first().json.bpm || 128;\nconst bars = $input.first().json.bars || 8;\nconst key = $input.first().json.key || 'A';\nconst scale = $input.first().json.scale || 'minor';\nconst ticksPerBeat = 480;\nconst beatsPerBar = 4;\n\n// Note mapping\nconst noteToMidi = {\n  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,\n  'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8,\n  'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11\n};\n\n// Scale intervals (semitones from root)\nconst scaleIntervals = {\n  'minor': [0, 2, 3, 5, 7, 8, 10],      // Natural minor\n  'major': [0, 2, 4, 5, 7, 9, 11],       // Major\n  'dorian': [0, 2, 3, 5, 7, 9, 10],      // Dorian (common in house)\n  'phrygian': [0, 1, 3, 5, 7, 8, 10]     // Phrygian\n};\n\n// Get root note MIDI number (octave 1 for bass)\nconst rootNote = noteToMidi[key] + 24; // C1 = 24\nconst intervals = scaleIntervals[scale] || scaleIntervals['minor'];\n\n// Create scale notes for bass (2 octaves)\nconst scaleNotes = [];\nfor (let octave = 0; octave < 2; octave++) {\n  intervals.forEach(interval => {\n    scaleNotes.push(rootNote + interval + (octave * 12));\n  });\n}\n\nconst midiEvents = [];\nlet eventId = 0;\n\n// House bass patterns (16th note patterns)\nconst bassPatterns = [\n  // Pattern 1: Root heavy with octave jumps\n  [\n    { step: 0, note: 0, duration: 2, velocity: 100 },   // Root\n    { step: 2, note: 0, duration: 1, velocity: 80 },    // Root\n    { step: 4, note: 7, duration: 2, velocity: 90 },    // Fifth\n    { step: 6, note: 0, duration: 1, velocity: 85 },    // Root\n    { step: 8, note: 0, duration: 2, velocity: 100 },   // Root\n    { step: 10, note: 3, duration: 1, velocity: 85 },   // Third\n    { step: 12, note: 0, duration: 2, velocity: 95 },   // Root\n    { step: 14, note: 7, duration: 1, velocity: 80 }    // Fifth\n  ],\n  // Pattern 2: Syncopated groove\n  [\n    { step: 0, note: 0, duration: 1.5, velocity: 100 },\n    { step: 2, note: 7, duration: 1, velocity: 85 },\n    { step: 3.5, note: 0, duration: 1, velocity: 90 },\n    { step: 5, note: 3, duration: 1.5, velocity: 85 },\n    { step: 7, note: 0, duration: 1, velocity: 95 },\n    { step: 8, note: 0, duration: 2, velocity: 100 },\n    { step: 11, note: 5, duration: 1, velocity: 80 },\n    { step: 13, note: 0, duration: 1.5, velocity: 90 },\n    { step: 15, note: 7, duration: 0.5, velocity: 75 }\n  ]\n];\n\n// Generate bass line\nfor (let bar = 0; bar < bars; bar++) {\n  const patternIndex = Math.floor(bar / 2) % bassPatterns.length;\n  const pattern = bassPatterns[patternIndex];\n  \n  // Progression: I - VI - III - VII (common house progression)\n  const progressionDegrees = [0, 5, 2, 6];\n  const chordRoot = progressionDegrees[bar % 4];\n  \n  pattern.forEach(note => {\n    const tick = (bar * beatsPerBar * ticksPerBeat) + (note.step * ticksPerBeat / 4);\n    const noteIndex = (chordRoot + note.note) % scaleNotes.length;\n    \n    midiEvents.push({\n      id: eventId++,\n      type: 'noteOn',\n      tick: tick,\n      note: scaleNotes[noteIndex],\n      velocity: note.velocity,\n      channel: 0,\n      duration: (note.duration * ticksPerBeat / 4)\n    });\n  });\n}\n\n// Sort by tick\nmidiEvents.sort((a, b) => a.tick - b.tick);\n\nreturn {\n  json: {\n    instrument: 'bass',\n    bpm: bpm,\n    bars: bars,\n    key: key,\n    scale: scale,\n    events: midiEvents,\n    totalTicks: bars * beatsPerBar * ticksPerBeat,\n    ticksPerBeat: ticksPerBeat\n  }\n};"
+      },
+      "id": "generate-bass",
+      "name": "Generate Bass Pattern",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert to MIDI file format\nconst data = $input.first().json;\nconst { events, bpm, ticksPerBeat, bars, key, scale } = data;\n\nconst midiData = {\n  format: 0,\n  tracks: 1,\n  ticksPerBeat: ticksPerBeat,\n  bpm: bpm,\n  track: {\n    name: `House Bass - ${key} ${scale}`,\n    channel: 0,\n    events: events.map(e => ({\n      type: e.type,\n      tick: e.tick,\n      note: e.note,\n      velocity: e.velocity,\n      duration: e.duration\n    }))\n  }\n};\n\nreturn {\n  json: {\n    ...data,\n    midiData: midiData,\n    filename: `house_bass_${key}_${scale}_${bpm}bpm_${bars}bars.mid`\n  }\n};"
+      },
+      "id": "format-midi",
+      "name": "Format MIDI Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Workflow Trigger": {
+      "main": [[{"node": "Set Parameters", "type": "main", "index": 0}]]
+    },
+    "Set Parameters": {
+      "main": [[{"node": "Generate Bass Pattern", "type": "main", "index": 0}]]
+    },
+    "Generate Bass Pattern": {
+      "main": [[{"node": "Format MIDI Data", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

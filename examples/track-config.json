@@ -1,0 +1,65 @@
+{
+  "examples": [
+    {
+      "name": "Classic Deep House",
+      "description": "Deep house track with warm bassline and lush chords",
+      "config": {
+        "bpm": 122,
+        "bars": 32,
+        "key": "F",
+        "scale": "minor"
+      }
+    },
+    {
+      "name": "Tech House Banger",
+      "description": "Driving tech house with punchy drums",
+      "config": {
+        "bpm": 128,
+        "bars": 16,
+        "key": "G",
+        "scale": "dorian"
+      }
+    },
+    {
+      "name": "Progressive House",
+      "description": "Uplifting progressive house with major key",
+      "config": {
+        "bpm": 126,
+        "bars": 64,
+        "key": "C",
+        "scale": "major"
+      }
+    },
+    {
+      "name": "Melodic House",
+      "description": "Melodic house with emotional chord progressions",
+      "config": {
+        "bpm": 124,
+        "bars": 32,
+        "key": "A",
+        "scale": "minor"
+      }
+    },
+    {
+      "name": "Peak Time House",
+      "description": "High energy peak time house music",
+      "config": {
+        "bpm": 130,
+        "bars": 16,
+        "key": "D",
+        "scale": "dorian"
+      }
+    },
+    {
+      "name": "Minimal House",
+      "description": "Stripped back minimal house groove",
+      "config": {
+        "bpm": 125,
+        "bars": 24,
+        "key": "E",
+        "scale": "minor"
+      }
+    }
+  ],
+  "usage": "Copy the config values into the n8n workflow 'Start - Configure Track' node"
+}
